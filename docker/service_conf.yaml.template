@@ -53,10 +53,17 @@ redis:
   password: '${REDIS_PASSWORD:-infini_rag_flow}'
   host: '${REDIS_HOST:-redis}:6379'
 user_default_llm:
+  factory: 'Ollama'
+  api_key: 'empty'
+  base_url: 'http://153.101.206.98:50028'
   default_models:
+    chat_model:
+      name: 'deepseek-r1:70b'
     embedding_model:
-      api_key: 'xxx'
-      base_url: 'http://${TEI_HOST}:80'
+      name: 'bge-m3:latest'
+    rerank_model: ''
+    asr_model: ''
+    image2text_model: ''
 # postgres:
 #   name: '${POSTGRES_DBNAME:-rag_flow}'
 #   user: '${POSTGRES_USER:-rag_flow}'
