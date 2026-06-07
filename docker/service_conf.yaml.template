@@ -54,8 +54,8 @@ redis:
   host: '${REDIS_HOST:-redis}:6379'
 user_default_llm:
   factory: 'Ollama'
-  api_key: 'empty'
-  base_url: 'http://153.101.206.98:50028'
+  api_key: '${OPENWEBUI_API_KEY:-empty}'
+  base_url: 'http://153.101.206.98:50028/ollama'
   default_models:
     chat_model:
       name: 'deepseek-r1:70b'

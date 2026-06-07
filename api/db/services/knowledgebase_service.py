@@ -422,6 +422,8 @@ class KnowledgebaseService(CommonService):
             "parser_id": (parser_id or "naive"),
             **kwargs # Includes optional fields such as description, language, permission, avatar, parser_config, etc.
         }
+        if not payload.get("embd_id"):
+            payload["embd_id"] = _t.embd_id
 
         # Update parser_config (always override with validated default/merged config)
         payload["parser_config"] = get_parser_config(parser_id, kwargs.get("parser_config"))
