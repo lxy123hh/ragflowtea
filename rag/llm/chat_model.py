@@ -1096,6 +1096,78 @@ class N1nChat(Base):
         super().__init__(key, model_name, base_url, **kwargs)
 
 
+class OllamaChat(Base):
+    _FACTORY_NAME = "Ollama"
+
+    def __init__(self, key=None, model_name="", base_url="", **kwargs):
+        from ollama import AsyncClient
+
+        if not base_url:
+            raise ValueError("Ollama base_url cannot be None")
+        headers = {}
+        if key and key not in ("x", "empty"):
+            headers["Authorization"] = f"Bearer {key}"
+        self.client = AsyncClient(host=base_url, headers=headers)
+        self.model_name = model_name.split("___")[0]
+
+    async def _async_chat(self, history, gen_conf, **kwargs):
+        logging.info("[OLLAMA_HISTORY]" + json.dumps(history, ensure_ascii=False, indent=2))
+        options = self._clean_conf(gen_conf)
+        response = await self.client.chat(
+            model=self.model_name,
+            messages=history,
+            stream=False,
+            options=options,
+        )
+        message = response.get("message") or {}
+        answer = (message.get("content") or "").strip()
+        return answer, response.get("eval_count", 0) + response.get("prompt_eval_count", 0)
+
+    async def _async_chat_streamly(self, history, gen_conf, **kwargs):
+        logging.info("[OLLAMA_HISTORY_STREAMLY]" + json.dumps(history, ensure_ascii=False, indent=2))
+        options = self._clean_conf(gen_conf)
+        total_tokens = 0
+        async for chunk in await self.client.chat(
+            model=self.model_name,
+            messages=history,
+            stream=True,
+            options=options,
+        ):
+            message = chunk.get("message") or {}
+            content = message.get("content") or ""
+            if content:
+                yield content, total_tokens
+            if chunk.get("done"):
+                total_tokens = chunk.get("eval_count", 0) + chunk.get("prompt_eval_count", 0)
+
+    async def async_chat(self, system, history, gen_conf={}, **kwargs):
+        if system and history and history[0].get("role") != "system":
+            history.insert(0, {"role": "system", "content": system})
+        return await self._async_chat(history, gen_conf, **kwargs)
+
+    async def async_chat_streamly(self, system, history, gen_conf={}, **kwargs):
+        if system and history and history[0].get("role") != "system":
+            history.insert(0, {"role": "system", "content": system})
+        async for delta, total_tokens in self._async_chat_streamly(history, gen_conf, **kwargs):
+            yield delta if delta else total_tokens
+
+    async def async_chat_streamly_delta(self, system, history, gen_conf={}, **kwargs):
+        async for delta in self.async_chat_streamly(system, history, gen_conf, **kwargs):
+            if isinstance(delta, int):
+                continue
+            yield delta
+
+    @staticmethod
+    def _clean_conf(gen_conf):
+        options = {}
+        for key in ["temperature", "top_p", "frequency_penalty", "presence_penalty", "num_predict"]:
+            if key in gen_conf:
+                options[key] = gen_conf[key]
+        if "max_tokens" in gen_conf:
+            options["num_predict"] = gen_conf["max_tokens"]
+        return options
+
+
 class LiteLLMBase(ABC):
     _FACTORY_NAME = [
         "Tongyi-Qianwen",
