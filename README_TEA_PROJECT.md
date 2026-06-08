@@ -9,6 +9,7 @@
 - 导入甲方 3 份茶业务 Excel 资料，构建 649 个知识片段、83,456 tokens。
 - 修复 RAGFlow 调用 Open WebUI Ollama Chat 代理不兼容问题。
 - 清洗 `deepseek-r1:70b` reasoning 输出，避免 `<think>` 内容暴露给业务用户。
+- 新增茶园业务 HTTP 工具服务，支持茶叶推荐、销售话术、价格库存查询和客户问题分流，可接入 RAGFlow Agent/Workflow。
 - 优化检索和生成参数，最终三类问题平均端到端耗时由 236.40 秒降至 206.90 秒，降低 12.48%。
 - 三类核心问题格式合规率 3/3，调试词和 reasoning 标签命中为 0。
 
@@ -49,6 +50,7 @@ test@qq.com / 123
 | [阶段 3 知识库导入](docs/tea_landing_stage_03_knowledgebase_import.md) | 甲方 Excel 导入、解析和知识库规模 |
 | [阶段 4 问答验收](docs/tea_landing_stage_04_qa_acceptance.md) | 茶健康、栽培、文化三类问答验收 |
 | [阶段 5 优化指标](docs/tea_landing_stage_05_optimization_resume_metrics.md) | 参数优化、reasoning 清洗、量化指标和简历成果 |
+| [阶段 6 Agent 工具](docs/tea_landing_stage_06_agent_tools.md) | 茶叶推荐、销售话术、价格库存和客户问题分流工具验收 |
 
 ## 与原 RAGFlow 框架的关系
 
@@ -59,6 +61,7 @@ RAGFlow 是本项目的底座。本仓库中的茶园项目工作重点是业务
 - RAGFlow 模型适配代码修复。
 - 甲方业务数据入库和解析策略选择。
 - 面向茶园老板场景的问答应用配置。
+- 面向销售咨询场景的 HTTP 工具服务扩展。
 - 输出质量优化、验收测试和简历材料沉淀。
 
 原 RAGFlow 官方说明见 [README.md](README.md)。

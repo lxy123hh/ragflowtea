@@ -49,6 +49,7 @@
 | Open WebUI | 本地模型统一管理和 API 代理 |
 | DeepSeek-R1 70B | Chat 生成模型 |
 | BGE-M3 | Embedding 向量模型 |
+| 茶园业务工具服务 | 茶叶推荐、销售话术、价格库存和客户问题分流 |
 
 ## 本地启动
 
@@ -176,6 +177,42 @@ Dialog ID：0537154e625611f1b6324b1f5b3b5659
 - 没有资料依据时说明“资料中未明确提到”。
 - 禁止输出 `<think>`、`</think>`、`知识库`、`检索` 等不适合客户可见的词。
 
+## Agent 工具调用能力
+
+为补齐“茶叶知识问答 + 业务动作”的 Agent 能力，项目新增独立 HTTP 工具服务：
+
+```text
+tools/tea_agent_tools/tea_business_tool_server.py
+```
+
+启动方式：
+
+```powershell
+python tools\tea_agent_tools\tea_business_tool_server.py --host 127.0.0.1 --port 18088
+```
+
+工具接口：
+
+| 接口 | 能力 |
+| --- | --- |
+| `POST /tools/recommend_tea` | 根据预算、口味、用途、人群、是否送礼、是否新手推荐茶品 |
+| `POST /tools/generate_sales_script` | 生成销售人员可直接使用的话术 |
+| `POST /tools/query_inventory` | 查询演示用价格和库存 |
+| `POST /tools/classify_question` | 判断客户问题类型和建议处理方式 |
+| `POST /agent/handle_customer` | 根据客户问题自动分流并调用业务工具 |
+
+验收结果：
+
+| 指标 | 结果 |
+| --- | ---: |
+| 业务工具接口 | 4 个 |
+| Agent 路由接口 | 1 个 |
+| 单元测试 | 5/5 通过 |
+| HTTP 验收接口 | 3 个通过 |
+| 本地规则工具计算耗时 | 低于 1ms |
+
+该能力用于处理普通 RAG 不适合自由生成的业务动作，例如价格库存查询、送礼推荐和销售话术生成。RAGFlow Agent/Workflow 可以通过 `http://127.0.0.1:18088/openapi.json` 接入这些 HTTP 工具。
+
 ## 关键问题与修复
 
 ### 1. Docker 无法连接
@@ -263,6 +300,9 @@ Input should be a valid dictionary
 | 知识片段数 | 649 |
 | Token 数 | 83,456 |
 | 核心业务测试问题 | 3 类 |
+| 业务工具接口 | 4 个 |
+| Agent 路由接口 | 1 个 |
+| 工具单元测试 | 5/5 通过 |
 
 优化指标：
 
@@ -307,6 +347,7 @@ RAGFlow、Docker Compose、MySQL、Elasticsearch、MinIO、Redis、Ollama、Open
 - 导入并解析甲方 3 份茶业务 Excel 资料，构建 649 个知识片段、83,456 tokens 的茶园业务知识库。
 - 围绕茶健康、茶树栽培、茶文化 3 类核心问题完成检索与问答验收，回答格式合规率达到 3/3，调试词和 reasoning 标签命中为 0。
 - 通过 top_n、top_k、max_tokens 与提示词优化，将检索上下文减少 33.33%、候选上限减少 50.00%、生成上限减少 16.67%，最终三类问题平均端到端耗时由 236.40 秒降至 206.90 秒，降低 12.48%。
+- 新增茶园业务 HTTP 工具服务，提供茶叶推荐、销售话术、价格库存查询和客户问题分流 4 类工具能力，完成 5 个单元测试和 3 个 HTTP 接口验收。
 ```
 
 ## 后续可扩展方向
