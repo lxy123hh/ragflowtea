@@ -43,6 +43,12 @@
   <a href="https://demo.ragflow.io">Demo</a>
 </h4>
 
+## 茶园业务知识库 AI 问答助手
+
+本仓库在 RAGFlow 开源框架基础上，完成了面向茶园老板的本地化 AI 知识库问答项目落地：接入 Open WebUI 管理的本地 Ollama 模型，使用 `deepseek-r1:70b` 和 `bge-m3:latest`，将甲方 3 份茶业务 Excel 资料构建为 649 个知识片段、83,456 tokens 的知识库，并完成模型代理适配、问答验收和量化优化。
+
+项目专属说明见 [README_TEA_PROJECT.md](README_TEA_PROJECT.md)，最终交付文档见 [docs/tea_project_final_delivery.md](docs/tea_project_final_delivery.md)，面试演示脚本见 [docs/tea_interview_demo_script.md](docs/tea_interview_demo_script.md)。
+
 <div align="center" style="margin-top:20px;margin-bottom:20px;">
 <img src="https://raw.githubusercontent.com/infiniflow/ragflow-docs/refs/heads/image/image/ragflow-octoverse.png" width="1200"/>
 </div>
