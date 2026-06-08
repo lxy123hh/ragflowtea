@@ -1120,7 +1120,7 @@ class OllamaChat(Base):
             options=options,
         )
         message = response.get("message") or {}
-        answer = (message.get("content") or "").strip()
+        answer = self._remove_reasoning_content(message.get("content") or "").strip()
         return answer, response.get("eval_count", 0) + response.get("prompt_eval_count", 0)
 
     async def _async_chat_streamly(self, history, gen_conf, **kwargs):
@@ -1166,6 +1166,14 @@ class OllamaChat(Base):
         if "max_tokens" in gen_conf:
             options["num_predict"] = gen_conf["max_tokens"]
         return options
+
+    @staticmethod
+    def _remove_reasoning_content(text: str) -> str:
+        if not text:
+            return ""
+        if "</think>" in text:
+            return text.split("</think>", 1)[1]
+        return re.sub(r"</?think>", "", text)
 
 
 class LiteLLMBase(ABC):
