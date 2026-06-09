@@ -26,6 +26,18 @@ cd D:\study\project\tea\ragflowtea\docker
 docker compose -f docker-compose.yml up -d
 ```
 
+启动茶园业务工具服务：
+
+```powershell
+docker compose -f docker-compose.yml up -d tea-agent-tools
+```
+
+RAGFlow Agent/Workflow 中工具 OpenAPI 地址：
+
+```text
+http://tea-agent-tools:18088/openapi.json
+```
+
 访问：
 
 ```text
@@ -51,6 +63,7 @@ test@qq.com / 123
 | [阶段 4 问答验收](docs/tea_landing_stage_04_qa_acceptance.md) | 茶健康、栽培、文化三类问答验收 |
 | [阶段 5 优化指标](docs/tea_landing_stage_05_optimization_resume_metrics.md) | 参数优化、reasoning 清洗、量化指标和简历成果 |
 | [阶段 6 Agent 工具](docs/tea_landing_stage_06_agent_tools.md) | 茶叶推荐、销售话术、价格库存和客户问题分流工具验收 |
+| [Agent 创建指南](docs/tea_agent_app_creation_guide.md) | 在 RAGFlow `/agents` 页面接入容器化 HTTP 工具的填写步骤 |
 
 ## 与原 RAGFlow 框架的关系
 

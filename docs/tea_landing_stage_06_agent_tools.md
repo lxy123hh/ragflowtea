@@ -32,6 +32,44 @@
 
 ## 启动方式
 
+### Docker Compose 启动
+
+本阶段已将工具服务容器化，推荐使用 Docker Compose 启动。工具容器复用 `${RAGFLOW_IMAGE}` 镜像并挂载工具脚本，不需要额外拉取 Python 基础镜像。
+
+进入 Docker 目录：
+
+```powershell
+cd D:\study\project\tea\ragflowtea\docker
+```
+
+启动工具服务：
+
+```powershell
+docker compose -f docker-compose.yml up -d tea-agent-tools
+```
+
+服务地址：
+
+| 访问方 | 地址 |
+| --- | --- |
+| RAGFlow 容器内 | `http://tea-agent-tools:18088` |
+| RAGFlow Agent/Workflow OpenAPI | `http://tea-agent-tools:18088/openapi.json` |
+| 宿主机浏览器或命令行 | `http://127.0.0.1:18088` |
+
+容器互通验证：
+
+```powershell
+docker compose -f docker-compose.yml exec ragflow-cpu python -c "import urllib.request; print(urllib.request.urlopen('http://tea-agent-tools:18088/health').read().decode())"
+```
+
+预期返回：
+
+```json
+{"status": "ok", "service": "tea-agent-tools"}
+```
+
+### Python 直接启动
+
 进入项目根目录：
 
 ```powershell
@@ -61,8 +99,8 @@ http://127.0.0.1:18088/openapi.json
 在 RAGFlow Agent 或 Workflow 中新增 HTTP 工具时，可以使用：
 
 ```text
-Base URL: http://127.0.0.1:18088
-OpenAPI: http://127.0.0.1:18088/openapi.json
+Base URL: http://tea-agent-tools:18088
+OpenAPI: http://tea-agent-tools:18088/openapi.json
 ```
 
 推荐接入顺序：

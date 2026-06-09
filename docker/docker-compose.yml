@@ -105,6 +105,26 @@ services:
               count: all
               capabilities: [gpu]
 
+  tea-agent-tools:
+    image: ${RAGFLOW_IMAGE}
+    container_name: tea-agent-tools
+    entrypoint:
+      - python
+    command:
+      - /tea_agent_tools/tea_business_tool_server.py
+      - --host
+      - 0.0.0.0
+      - --port
+      - "18088"
+    ports:
+      - "18088:18088"
+    volumes:
+      - ../tools/tea_agent_tools:/tea_agent_tools:ro
+    env_file: .env
+    networks:
+      - ragflow
+    restart: unless-stopped
+
 
   # executor:
   #   depends_on:

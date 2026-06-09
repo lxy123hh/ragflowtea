@@ -14,6 +14,40 @@
 
 ## 启动
 
+### Docker Compose 启动
+
+在 `docker` 目录执行。该服务复用 `${RAGFLOW_IMAGE}` 镜像并挂载工具脚本，不需要额外拉取 Python 基础镜像。
+
+```powershell
+docker compose -f docker-compose.yml up -d tea-agent-tools
+```
+
+RAGFlow 容器内访问地址：
+
+```text
+http://tea-agent-tools:18088
+```
+
+Agent / Workflow 中推荐使用：
+
+```text
+http://tea-agent-tools:18088/openapi.json
+```
+
+本机或服务器外部访问：
+
+```text
+http://127.0.0.1:18088
+```
+
+验证容器互通：
+
+```powershell
+docker compose -f docker-compose.yml exec ragflow-cpu python -c "import urllib.request; print(urllib.request.urlopen('http://tea-agent-tools:18088/health').read().decode())"
+```
+
+### Python 直接启动
+
 在项目根目录执行：
 
 ```powershell
