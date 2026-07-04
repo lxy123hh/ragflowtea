@@ -14,9 +14,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { v4 as uuid } from 'uuid';
 import { useCreateConversationBeforeSendMessage } from './use-chat-url';
+import { useImage2Text } from './use-image2text';
 import { useFindPrologueFromDialogList } from './use-select-conversation-list';
 import { useUploadFile } from './use-upload-file';
-import { useImage2Text } from './use-image2text';
 
 const IMAGE_FILE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
@@ -31,22 +31,6 @@ function isImageFile(file: File) {
   );
 
   return mimeMatched || extMatched;
-}
-
-function buildImageRagQuestion(visionText: string, userQuestion: string) {
-  return `用户上传了一张茶园或茶叶相关图片，视觉模型识别结果如下：
-
-【图片识别结果】
-${visionText}
-
-【用户原问题】
-${userQuestion}
-
-请结合知识库内容回答。要求：
-1. 先说明图片中可见现象；
-2. 再结合茶园知识库判断可能原因；
-3. 给出处理建议；
-4. 如果无法确定，请说明还需要补充哪些信息。`;
 }
 
 export const useSelectNextMessages = () => {
@@ -126,25 +110,28 @@ export const useSendMessage = (controller: AbortController) => {
       messages,
       enableInternet,
       enableThinking,
+      image2text_context,
     }: {
       message: IMessage;
       currentConversationId?: string;
       messages?: IMessage[];
+      image2text_context?: string;
     } & NextMessageInputOnPressEnterParameter) => {
-      const res = await send(
-        {
-          conversation_id: currentConversationId ?? conversationId,
-          messages: [
-            ...(Array.isArray(messages) && messages?.length > 0
-              ? messages
-              : (derivedMessages ?? [])),
-            message,
-          ],
-          reasoning: enableThinking,
-          internet: enableInternet,
-        },
-        controller,
-      );
+      const body: Record<string, any> = {
+        conversation_id: currentConversationId ?? conversationId,
+        messages: [
+          ...(Array.isArray(messages) && messages?.length > 0
+            ? messages
+            : (derivedMessages ?? [])),
+          message,
+        ],
+        reasoning: enableThinking,
+        internet: enableInternet,
+      };
+      if (image2text_context) {
+        body.image2text_context = image2text_context;
+      }
+      const res = await send(body, controller);
 
       if (res && (res?.response.status !== 200 || res?.data?.code !== 0)) {
         // cancel loading
@@ -182,12 +169,11 @@ export const useSendMessage = (controller: AbortController) => {
       if (trim(userQuestion) === '') return;
 
       const imageFile = rawFiles.find(isImageFile);
-      let finalContent = userQuestion;
+      let visionText: string | undefined;
 
       if (imageFile) {
         try {
-          const visionText = await image2text(imageFile);
-          finalContent = buildImageRagQuestion(visionText, userQuestion);
+          visionText = await image2text(imageFile);
         } catch (error) {
           console.error('Image2Text failed:', error);
           return;
@@ -206,7 +192,7 @@ export const useSendMessage = (controller: AbortController) => {
 
       addNewestQuestion({
         content: userQuestion,
-        files: files,
+        files: [...files, ...rawFiles.filter(isImageFile)],
         id,
         role: MessageType.User,
         conversationId: targetConversationId,
@@ -219,13 +205,14 @@ export const useSendMessage = (controller: AbortController) => {
           messages: currentMessages,
           message: {
             id,
-            content: finalContent,
+            content: userQuestion,
             role: MessageType.User,
             files: files,
             conversationId: targetConversationId,
           },
           enableInternet,
           enableThinking,
+          image2text_context: visionText,
         });
       }
       clearFiles();

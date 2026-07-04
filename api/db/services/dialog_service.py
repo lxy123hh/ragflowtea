@@ -298,9 +298,21 @@ def repair_bad_citation_formats(answer: str, kbinfos: dict, idx: set):
 
 
 async def async_chat(dialog, messages, stream=True, **kwargs):
+    image2text_context = kwargs.pop("image2text_context", None)
     logging.debug("Begin async_chat")
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
     if not dialog.kb_ids and not dialog.prompt_config.get("tavily_api_key"):
+        if image2text_context:
+            messages = deepcopy(messages)
+            messages[-1]["content"] = f"""用户上传了一张图片，视觉模型识别结果如下：
+
+【图片识别结果】
+{image2text_context}
+
+【用户原问题】
+{messages[-1]["content"]}
+
+请结合知识库内容回答。"""
         async for ans in async_chat_solo(dialog, messages, stream):
             yield ans
         return
@@ -495,7 +507,20 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
-    msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"])
+    if image2text_context:
+        messages_for_llm = deepcopy(messages)
+        messages_for_llm[-1]["content"] = f"""用户上传了一张图片，视觉模型识别结果如下：
+
+【图片识别结果】
+{image2text_context}
+
+【用户原问题】
+{messages_for_llm[-1]["content"]}
+
+请结合知识库内容回答。"""
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages_for_llm if m["role"] != "system"])
+    else:
+        msg.extend([{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"])
     used_token_count, msg = message_fit_in(msg, int(max_tokens * 0.95))
     assert len(msg) >= 2, f"message_fit_in has bug: {msg}"
     prompt = msg[0]["content"]
