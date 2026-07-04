@@ -47,14 +47,15 @@ redis:
 task_executor:
   message_queue_type: 'redis'
 user_default_llm:
-  factory: 'Ollama'
-  api_key: 'empty'
-  base_url: 'http://153.101.206.98:50028'
+  factory: 'VLLM'
+  api_key: 'sk-ragflow-local'
+  base_url: 'http://221.230.21.203:50028'
   default_models:
     chat_model:
-        name: 'deepseek-r1:70b'
+        name: 'qwen3'
+        base_url: 'http://221.230.21.203:50028/v1'
     embedding_model:
-        name: 'bge-m3:latest'
+        name: 'bge-m3'
     rerank_model: ''
     asr_model: ''
     image2text_model: ''
