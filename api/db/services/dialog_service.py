@@ -195,8 +195,10 @@ async def async_chat_solo(dialog, messages, stream=True):
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
     if attachments and msg:
         msg[-1]["content"] += attachments
+    system_prompt = append_answer_policy(prompt_config.get("system", ""))
+
     if stream:
-        stream_iter = chat_mdl.async_chat_streamly_delta(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        stream_iter = chat_mdl.async_chat_streamly_delta(system_prompt, msg, dialog.llm_setting)
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             if kind == "marker":
                 flags = {"start_to_think": True} if value == "<think>" else {"end_to_think": True}
@@ -204,7 +206,7 @@ async def async_chat_solo(dialog, messages, stream=True):
                 continue
             yield {"answer": value, "reference": {}, "audio_binary": tts(tts_mdl, value), "prompt": "", "created_at": time.time(), "final": False}
     else:
-        answer = await chat_mdl.async_chat(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        answer = await chat_mdl.async_chat(system_prompt, msg, dialog.llm_setting)
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
@@ -233,6 +235,29 @@ def get_models(dialog):
     if dialog.prompt_config.get("tts"):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
     return kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl
+
+
+def append_answer_policy(system_prompt: str, no_kb_retrieved: bool = False) -> str:
+    policy = """
+
+## 回答语言规则
+- 你必须始终使用中文回答。
+- 除非是专业术语、代码、命令、API 名称、模型名称、英文原文标题、报错信息、配置项、文件路径等必须保留英文的内容，否则不要使用英文回答。
+- 如果用户使用英文提问，也优先用中文回答；必要时可以保留关键英文术语并给出中文解释。
+- 回答要自然、清楚、实用，不要因为遵守中文要求而机械翻译专有名词。
+"""
+    if no_kb_retrieved:
+        policy += """
+
+## 知识库未命中规则
+- 本轮知识库没有检索到可用内容。
+- 回答开头必须明确说明："知识库中未检索到相关内容，以下回答基于通用知识，仅供参考。"
+- 之后可以基于你的通用知识回答用户问题。
+- 不要伪造知识库来源。
+- 不要编造引用、文档名、页码或 ID。
+- 如果问题涉及具体项目、私有数据、实时信息或无法确定的内容，要明确说明不确定，并建议用户补充资料或上传相关知识库文档。
+"""
+    return f"{system_prompt.rstrip()}\n\n{policy}"
 
 
 BAD_CITATION_PATTERNS = [
@@ -449,16 +474,24 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     logging.debug("{}->{}".format(" ".join(questions), "\n->".join(knowledges)))
 
     retrieval_ts = timer()
-    if not knowledges and prompt_config.get("empty_response"):
-        empty_res = prompt_config["empty_response"]
-        yield {"answer": empty_res, "reference": kbinfos, "prompt": "\n\n### Query:\n%s" % " ".join(questions),
-               "audio_binary": tts(tts_mdl, empty_res), "final": True}
-        return
+    no_kb_retrieved = not bool(knowledges)
 
-    kwargs["knowledge"] = "\n------\n" + "\n\n------\n\n".join(knowledges)
+    if no_kb_retrieved:
+        kwargs["knowledge"] = (
+            "\n------\n"
+            "本轮知识库没有检索到可用内容。"
+            "请不要伪造知识库来源，也不要生成引用 ID。"
+            "你可以基于通用知识回答，但必须明确说明知识库未检索到相关内容。"
+        )
+    else:
+        kwargs["knowledge"] = "\n------\n" + "\n\n------\n\n".join(knowledges)
+
     gen_conf = dialog.llm_setting
 
-    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs)+attachments_}]
+    system_prompt = prompt_config["system"].format(**kwargs) + attachments_
+    system_prompt = append_answer_policy(system_prompt, no_kb_retrieved)
+
+    msg = [{"role": "system", "content": system_prompt}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
