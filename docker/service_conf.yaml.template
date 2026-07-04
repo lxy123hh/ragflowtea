@@ -64,7 +64,8 @@ user_default_llm:
       name: 'bge-m3'
     rerank_model: ''
     asr_model: ''
-    image2text_model: 'qwen-vl'
+    image2text_model:
+      name: 'qwen-vl'
 # postgres:
 #   name: '${POSTGRES_DBNAME:-rag_flow}'
 #   user: '${POSTGRES_USER:-rag_flow}'
