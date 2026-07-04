@@ -23,6 +23,7 @@ const {
   deleteMessage,
   thumbup,
   tts,
+  image2text,
   ask,
   mindmap,
   getRelatedQuestions,
@@ -114,6 +115,10 @@ const methods = {
   },
   tts: {
     url: tts,
+    method: 'post',
+  },
+  image2text: {
+    url: image2text,
     method: 'post',
   },
   ask: {

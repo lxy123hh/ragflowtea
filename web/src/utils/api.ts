@@ -53,6 +53,7 @@ export default {
   llm_tools: `${api_host}/plugin/llm_tools`,
 
   sequence2txt: `${api_host}/conversation/sequence2txt`,
+  image2text: `${api_host}/conversation/image2text`,
 
   // knowledge base
 
