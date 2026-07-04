@@ -11,9 +11,10 @@ IMAGE2TEXT_API_BASE="http://221.230.21.203:50028"
 FACTORY="VLLM"
 MODEL_NAME="qwen-vl"
 API_KEY="sk-ragflow-local"
-MYSQL_USER="root"
-MYSQL_PASSWORD="infini_rag_flow"
-MYSQL_DB="rag_flow"
+MYSQL_USER="${MYSQL_USER:-root}"
+MYSQL_PASSWORD="${MYSQL_PASSWORD:-infini_rag_flow}"
+MYSQL_DB="${MYSQL_DB:-rag_flow}"
+MYSQL_PORT="${MYSQL_PORT:-5455}"
 
 # -----------------------------------------------------------------------------
 # 颜色
@@ -31,8 +32,8 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # -----------------------------------------------------------------------------
 find_mysql_cmd() {
     if command -v mysql &> /dev/null; then
-        if mysql -h 127.0.0.1 -P 5455 -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "SELECT 1" &> /dev/null; then
-            echo "mysql -h 127.0.0.1 -P 5455 -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DB}"
+        if mysql -h 127.0.0.1 -P "${MYSQL_PORT}" -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "SELECT 1" &> /dev/null; then
+            echo "mysql -h 127.0.0.1 -P ${MYSQL_PORT} -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DB}"
             return
         fi
     fi
@@ -51,7 +52,7 @@ MYSQL_CMD=$(find_mysql_cmd)
 
 if [ -z "$MYSQL_CMD" ]; then
     error "无法连接到 MySQL"
-    echo "  1. 检查端口 5455: netstat -tlnp | grep 5455"
+    echo "  1. 检查端口 ${MYSQL_PORT}: netstat -tlnp | grep ${MYSQL_PORT}"
     echo "  2. 检查容器: docker ps | grep mysql"
     exit 1
 fi
@@ -77,7 +78,7 @@ info "步骤1: 添加 image2text 模型 qwen-vl___VLLM ..."
 
 eval "${MYSQL_CMD}" <<SQL
 INSERT INTO tenant_llm (tenant_id, llm_factory, model_type, llm_name, api_base, api_key, max_tokens, used_tokens, status)
-SELECT t.id, '${FACTORY}', 'image2text', '${MODEL_NAME}___${FACTORY}', '${IMAGE2TEXT_API_BASE}', '${API_KEY}', 4096, 0, '1'
+SELECT t.id, '${FACTORY}', 'image2text', '${MODEL_NAME}___${FACTORY}', '${IMAGE2TEXT_API_BASE}', '${API_KEY}', 8192, 0, '1'
 FROM tenant t
 WHERE NOT EXISTS (
     SELECT 1 FROM tenant_llm tl
@@ -93,13 +94,15 @@ info "完成"
 # -----------------------------------------------------------------------------
 info "步骤2: 更新 tenant.img2txt_id ..."
 
-CHANGED=$(eval "${MYSQL_CMD} -N -e \"SELECT COUNT(*) FROM tenant WHERE img2txt_id NOT LIKE '%${MODEL_NAME}@${FACTORY}%';\"")
+CHANGED=$(eval "${MYSQL_CMD} -N -e \"SELECT COUNT(*) FROM tenant WHERE img2txt_id IS NULL OR img2txt_id = '' OR img2txt_id <> '${MODEL_NAME}@${FACTORY}';\"")
 info "需要更新的租户: ${CHANGED}"
 
 eval "${MYSQL_CMD}" <<SQL
 UPDATE tenant
 SET img2txt_id = '${MODEL_NAME}@${FACTORY}'
-WHERE img2txt_id NOT LIKE '%${MODEL_NAME}@${FACTORY}%';
+WHERE img2txt_id IS NULL
+   OR img2txt_id = ''
+   OR img2txt_id <> '${MODEL_NAME}@${FACTORY}';
 SQL
 info "完成"
 
