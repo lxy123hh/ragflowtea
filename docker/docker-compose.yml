@@ -41,6 +41,9 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template
       - ./entrypoint.sh:/ragflow/entrypoint.sh
+      - ../api:/ragflow/api
+      - ../rag:/ragflow/rag
+      - ../common:/ragflow/common
     env_file: .env
     networks:
       - ragflow
@@ -89,6 +92,9 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template
       - ./entrypoint.sh:/ragflow/entrypoint.sh
+      - ../api:/ragflow/api
+      - ../rag:/ragflow/rag
+      - ../common:/ragflow/common
     env_file: .env
     networks:
       - ragflow
