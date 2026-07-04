@@ -8,6 +8,21 @@ import { useCallback, useState } from 'react';
 import { useChatUrlParams } from './use-chat-url';
 import { useSetConversation } from './use-set-conversation';
 
+const IMAGE_FILE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+
+function isImageFile(file: File) {
+  const mimeMatched = ['image/jpeg', 'image/png', 'image/webp'].includes(
+    file.type,
+  );
+
+  const lowerName = file.name.toLowerCase();
+  const extMatched = IMAGE_FILE_EXTENSIONS.some((ext) =>
+    lowerName.endsWith(ext),
+  );
+
+  return mimeMatched || extMatched;
+}
+
 export function useUploadFile() {
   const { uploadAndParseFile, loading, cancel } = useUploadAndParseFile();
   const [currentFiles, setCurrentFiles] = useState<Record<string, any>[]>([]);
@@ -30,6 +45,12 @@ export function useUploadFile() {
     ) => {
       if (Array.isArray(files) && files.length) {
         for (const file of files) {
+          if (isImageFile(file)) {
+            options?.onProgress?.(file, 100);
+            options?.onSuccess?.(file);
+            continue;
+          }
+
           const ret = await uploadAndParseFile({
             file,
             options,

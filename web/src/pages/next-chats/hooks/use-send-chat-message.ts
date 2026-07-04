@@ -10,12 +10,44 @@ import { useGetChatSearchParams } from '@/hooks/use-chat-request';
 import { IMessage } from '@/interfaces/database/chat';
 import api from '@/utils/api';
 import { trim } from 'lodash';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { v4 as uuid } from 'uuid';
 import { useCreateConversationBeforeSendMessage } from './use-chat-url';
 import { useFindPrologueFromDialogList } from './use-select-conversation-list';
 import { useUploadFile } from './use-upload-file';
+import { useImage2Text } from './use-image2text';
+
+const IMAGE_FILE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+
+function isImageFile(file: File) {
+  const mimeMatched = ['image/jpeg', 'image/png', 'image/webp'].includes(
+    file.type,
+  );
+
+  const lowerName = file.name.toLowerCase();
+  const extMatched = IMAGE_FILE_EXTENSIONS.some((ext) =>
+    lowerName.endsWith(ext),
+  );
+
+  return mimeMatched || extMatched;
+}
+
+function buildImageRagQuestion(visionText: string, userQuestion: string) {
+  return `用户上传了一张茶园或茶叶相关图片，视觉模型识别结果如下：
+
+【图片识别结果】
+${visionText}
+
+【用户原问题】
+${userQuestion}
+
+请结合知识库内容回答。要求：
+1. 先说明图片中可见现象；
+2. 再结合茶园知识库判断可能原因；
+3. 给出处理建议；
+4. 如果无法确定，请说明还需要补充哪些信息。`;
+}
 
 export const useSelectNextMessages = () => {
   const {
@@ -66,6 +98,8 @@ export const useSelectNextMessages = () => {
 export const useSendMessage = (controller: AbortController) => {
   const { conversationId, isNew } = useGetChatSearchParams();
   const { handleInputChange, value, setValue } = useHandleMessageInputChange();
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+  const { image2text, image2textLoading } = useImage2Text();
 
   const { handleUploadFile, isUploading, removeFile, files, clearFiles } =
     useUploadFile();
@@ -143,9 +177,24 @@ export const useSendMessage = (controller: AbortController) => {
       enableThinking,
       enableInternet,
     }: NextMessageInputOnPressEnterParameter) => {
-      if (trim(value) === '') return;
+      const userQuestion = value.trim();
 
-      const data = await createConversationBeforeSendMessage(value);
+      if (trim(userQuestion) === '') return;
+
+      const imageFile = rawFiles.find(isImageFile);
+      let finalContent = userQuestion;
+
+      if (imageFile) {
+        try {
+          const visionText = await image2text(imageFile);
+          finalContent = buildImageRagQuestion(visionText, userQuestion);
+        } catch (error) {
+          console.error('Image2Text failed:', error);
+          return;
+        }
+      }
+
+      const data = await createConversationBeforeSendMessage(userQuestion);
 
       if (data === undefined) {
         return;
@@ -156,7 +205,7 @@ export const useSendMessage = (controller: AbortController) => {
       const id = uuid();
 
       addNewestQuestion({
-        content: value,
+        content: userQuestion,
         files: files,
         id,
         role: MessageType.User,
@@ -170,7 +219,7 @@ export const useSendMessage = (controller: AbortController) => {
           messages: currentMessages,
           message: {
             id,
-            content: value.trim(),
+            content: finalContent,
             role: MessageType.User,
             files: files,
             conversationId: targetConversationId,
@@ -180,9 +229,12 @@ export const useSendMessage = (controller: AbortController) => {
         });
       }
       clearFiles();
+      setRawFiles([]);
     },
     [
       value,
+      rawFiles,
+      image2text,
       createConversationBeforeSendMessage,
       addNewestQuestion,
       files,
@@ -215,5 +267,7 @@ export const useSendMessage = (controller: AbortController) => {
     isUploading,
     removeFile,
     setDerivedMessages,
+    setRawFiles,
+    image2textLoading,
   };
 };

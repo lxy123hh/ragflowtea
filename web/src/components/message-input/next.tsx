@@ -45,6 +45,7 @@ interface NextMessageInputProps {
   isShared?: boolean;
   showUploadIcon?: boolean;
   isUploading?: boolean;
+  onFilesChange?(files: File[]): void;
   onPressEnter({
     enableThinking,
     enableInternet,
@@ -72,6 +73,7 @@ export function NextMessageInput({
   stopOutputMessage,
   onPressEnter,
   removeFile,
+  onFilesChange,
   showReasoning = false,
   showInternet = false,
 }: NextMessageInputProps) {
@@ -79,6 +81,10 @@ export function NextMessageInput({
   const [audioInputValue, setAudioInputValue] = React.useState<string | null>(
     null,
   );
+
+  useEffect(() => {
+    onFilesChange?.(files);
+  }, [files, onFilesChange]);
 
   const [enableThinking, setEnableThinking] = useState(false);
   const [enableInternet, setEnableInternet] = useState(false);

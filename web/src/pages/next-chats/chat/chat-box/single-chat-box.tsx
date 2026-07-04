@@ -38,6 +38,7 @@ export function SingleChatBox({
     sendLoading,
     derivedMessages,
     isUploading,
+    image2textLoading,
     handleInputChange,
     handlePressEnter,
     regenerateMessage,
@@ -45,6 +46,7 @@ export function SingleChatBox({
     handleUploadFile,
     removeFile,
     setDerivedMessages,
+    setRawFiles,
   } = useSendMessage(controller);
   const { data: userInfo } = useFetchUserInfo();
   const { data: currentDialog } = useFetchDialog();
@@ -121,8 +123,9 @@ export function SingleChatBox({
         }
         stopOutputMessage={stopOutputMessage}
         onUpload={handleUploadFile}
-        isUploading={isUploading}
+        isUploading={isUploading || image2textLoading}
         removeFile={removeFile}
+        onFilesChange={setRawFiles}
         showReasoning
         showInternet={showInternet}
       />
