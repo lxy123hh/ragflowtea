@@ -309,6 +309,82 @@ async def sequence2txt():
 
     return Response(event_stream(), content_type="text/event-stream")
 
+
+@manager.route("/image2text", methods=["POST"])  # noqa: F821
+@login_required
+async def image2text():
+    temp_path = None
+
+    try:
+        req = await request.form
+        prompt = (req.get("prompt") or "").strip()
+
+        files = await request.files
+        if "file" not in files:
+            return get_data_error_result(message="Missing 'file' in multipart form-data")
+
+        uploaded = files["file"]
+        filename = uploaded.filename or ""
+        _, ext = os.path.splitext(filename.lower())
+
+        allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
+        if ext not in allowed_exts:
+            return get_data_error_result(
+                message=f"Unsupported image format: {ext}. Allowed: {', '.join(sorted(allowed_exts))}"
+            )
+
+        tenants = TenantService.get_info_by(current_user.id)
+        if not tenants:
+            return get_data_error_result(message="Tenant not found!")
+
+        img2txt_id = tenants[0].get("img2txt_id")
+        if not img2txt_id:
+            return get_data_error_result(message="No default image2text model is set")
+
+        fd, temp_path = tempfile.mkstemp(suffix=ext)
+        os.close(fd)
+        await uploaded.save(temp_path)
+
+        with open(temp_path, "rb") as f:
+            image_bytes = f.read()
+
+        if not image_bytes:
+            return get_data_error_result(message="Empty image file")
+
+        if not prompt:
+            prompt = (
+                "你是茶园图片识别助手。请只根据图片中可见内容进行描述，"
+                "不要直接给最终农技处方。请判断图片是否属于茶园、茶树、鲜叶、干茶、茶汤或茶具场景。"
+                "如果不是茶相关场景，请明确说明。"
+                "请输出：1. 可见现象；2. 疑似问题；3. 需要进一步确认的信息；4. 适合知识库检索的关键词。"
+            )
+
+        cv_mdl = LLMBundle(
+            tenants[0]["tenant_id"],
+            LLMType.IMAGE2TEXT,
+            lang="Chinese",
+        )
+
+        text = cv_mdl.describe_with_prompt(image_bytes, prompt)
+
+        return get_json_result(
+            data={
+                "model": img2txt_id,
+                "text": text,
+            }
+        )
+
+    except Exception as e:
+        return server_error_response(e)
+
+    finally:
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except Exception as e:
+                logging.error(f"Failed to remove temp image file: {str(e)}")
+
+
 @manager.route("/tts", methods=["POST"])  # noqa: F821
 @login_required
 async def tts():
