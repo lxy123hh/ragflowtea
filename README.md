@@ -25,3 +25,7 @@ SELECT id,name,llm_id,kb_ids FROM dialog WHERE status='1' ORDER BY create_time D
 
   1. 改 YAML 配置 — service_conf.yaml.template 里 user_default_llm 从原来的 Ollama 改成 VLLM 工厂 + qwen3/bge-m3/qwen-vl，指向 litellm 代理地址，带上 sk-ragflow-local 密钥。
    2. 改数据库 — migrate_to_vllm.sh 做的事：往 tenant_llm 表给每个租户插入 VLLM 模型记录（llm_name 带 ___VLLM后缀），再更新 tenant 表的 llm_id / embd_id 指向这些新记录。这让已有用户能在下拉框里看到并选中 VLLM 模型。
+
+ragflowtea\docker\add_qwen_vl.sh
+
+add_bge_m3.sh
