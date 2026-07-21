@@ -256,7 +256,7 @@ class QWenCV(GptV4):
             except Exception as e:
                 return "**ERROR**: " + str(e), 0
 
-        return "**ERROR**: Method chat not supported yet.", 0
+        return await super().async_chat(system, history, gen_conf, images=images, **kwargs)
 
     def _process_video(self, video_bytes, filename):
         from dashscope import MultiModalConversation

@@ -179,11 +179,20 @@ class DialogService(CommonService):
         return res
 
 
+def _split_file_attachments(files):
+    """Keep images out of the text prompt so VLMs receive real image inputs."""
+    contents = FileService.get_files(files)
+    images = [content for content in contents if content.startswith("data:image/")]
+    text = "\n\n".join(content for content in contents if not content.startswith("data:image/"))
+    return text, images
+
+
 async def async_chat_solo(dialog, messages, stream=True):
-    attachments = ""
-    if "files" in messages[-1]:
-        attachments = "\n\n".join(FileService.get_files(messages[-1]["files"]))
-    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
+    attachment_text, attachment_images = _split_file_attachments(messages[-1].get("files"))
+    is_image_model = TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text"
+    if attachment_images and not is_image_model:
+        raise ValueError("Image attachments require an image2text model.")
+    if is_image_model:
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
     else:
         chat_mdl = LLMBundle(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
@@ -193,10 +202,12 @@ async def async_chat_solo(dialog, messages, stream=True):
     if prompt_config.get("tts"):
         tts_mdl = LLMBundle(dialog.tenant_id, LLMType.TTS)
     msg = [{"role": m["role"], "content": re.sub(r"##\d+\$\$", "", m["content"])} for m in messages if m["role"] != "system"]
-    if attachments and msg:
-        msg[-1]["content"] += attachments
+    if attachment_text and msg:
+        msg[-1]["content"] += "\n\n" + attachment_text
     if stream:
-        stream_iter = chat_mdl.async_chat_streamly_delta(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        stream_iter = chat_mdl.async_chat_streamly_delta(
+            prompt_config.get("system", ""), msg, dialog.llm_setting, images=attachment_images or None
+        )
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             if kind == "marker":
                 flags = {"start_to_think": True} if value == "<think>" else {"end_to_think": True}
@@ -204,7 +215,9 @@ async def async_chat_solo(dialog, messages, stream=True):
                 continue
             yield {"answer": value, "reference": {}, "audio_binary": tts(tts_mdl, value), "prompt": "", "created_at": time.time(), "final": False}
     else:
-        answer = await chat_mdl.async_chat(prompt_config.get("system", ""), msg, dialog.llm_setting)
+        answer = await chat_mdl.async_chat(
+            prompt_config.get("system", ""), msg, dialog.llm_setting, images=attachment_images or None
+        )
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         yield {"answer": answer, "reference": {}, "audio_binary": tts(tts_mdl, answer), "prompt": "", "created_at": time.time()}
@@ -282,7 +295,8 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
 
     chat_start_ts = timer()
 
-    if TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text":
+    is_image_model = TenantLLMService.llm_id2llm_type(dialog.llm_id) == "image2text"
+    if is_image_model:
         llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.IMAGE2TEXT, dialog.llm_id)
     else:
         llm_model_config = TenantLLMService.get_model_config(dialog.tenant_id, LLMType.CHAT, dialog.llm_id)
@@ -315,11 +329,14 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     retriever = settings.retriever
     questions = [m["content"] for m in messages if m["role"] == "user"][-3:]
     attachments = kwargs["doc_ids"].split(",") if "doc_ids" in kwargs else []
-    attachments_= ""
+    attachment_text = ""
+    attachment_images = []
     if "doc_ids" in messages[-1]:
         attachments = messages[-1]["doc_ids"]
     if "files" in messages[-1]:
-        attachments_ = "\n\n".join(FileService.get_files(messages[-1]["files"]))
+        attachment_text, attachment_images = _split_file_attachments(messages[-1]["files"])
+    if attachment_images and not is_image_model:
+        raise ValueError("Image attachments require an image2text model.")
 
     prompt_config = dialog.prompt_config
     field_map = KnowledgebaseService.get_field_map(dialog.kb_ids)
@@ -458,7 +475,7 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
     kwargs["knowledge"] = "\n------\n" + "\n\n------\n\n".join(knowledges)
     gen_conf = dialog.llm_setting
 
-    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs)+attachments_}]
+    msg = [{"role": "system", "content": prompt_config["system"].format(**kwargs) + attachment_text}]
     prompt4citation = ""
     if knowledges and (prompt_config.get("quote", True) and kwargs.get("quote", True)):
         prompt4citation = citation_prompt()
@@ -555,7 +572,9 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
         )
 
     if stream:
-        stream_iter = chat_mdl.async_chat_streamly_delta(prompt + prompt4citation, msg[1:], gen_conf)
+        stream_iter = chat_mdl.async_chat_streamly_delta(
+            prompt + prompt4citation, msg[1:], gen_conf, images=attachment_images or None
+        )
         last_state = None
         async for kind, value, state in _stream_with_think_delta(stream_iter):
             last_state = state
@@ -572,7 +591,9 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
             final["answer"] = ""
             yield final
     else:
-        answer = await chat_mdl.async_chat(prompt + prompt4citation, msg[1:], gen_conf)
+        answer = await chat_mdl.async_chat(
+            prompt + prompt4citation, msg[1:], gen_conf, images=attachment_images or None
+        )
         user_content = msg[-1].get("content", "[content not available]")
         logging.debug("User: {}|Assistant: {}".format(user_content, answer))
         res = decorate_answer(answer)
